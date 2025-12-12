@@ -1,0 +1,44 @@
+# Orchestration
+
+{
+  "Comment": "Supply Chain ETL Workflow",
+  "StartAt": "StartCrawler",
+  "States": {
+    "StartCrawler": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::glue:startCrawler.sync",
+      "Parameters": {
+        "Name": "supply-chain-crawler"
+      },
+      "Next": "RunETL"
+    },
+    "RunETL": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::glue:startJobRun.sync",
+      "Parameters": {
+        "JobName": "supply-chain-etl-job"
+      },
+      "Next": "LoadRedshift"
+    },
+    "LoadRedshift": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::redshift-data:executeStatement.sync",
+      "Parameters": {
+        "ClusterIdentifier": "your-redshift-cluster",
+        "Database": "dev",
+        "Sql": "COPY staging.sales_staging FROM 's3://supply-chain-data-lake/processed/sales/' IAM_ROLE 'arn:aws:iam::YOUR-ACCOUNT:role/RedshiftCopyRole' FORMAT AS PARQUET; INSERT INTO fact_sales ...; VACUUM fact_sales;"
+      },
+      "Next": "RefreshMV"
+    },
+    "RefreshMV": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::redshift-data:executeStatement.sync",
+      "Parameters": {
+        "ClusterIdentifier": "your-redshift-cluster",
+        "Database": "dev",
+        "Sql": "REFRESH MATERIALIZED VIEW weekly_sales_mv;"
+      },
+      "End": true
+    }
+  }
+}
